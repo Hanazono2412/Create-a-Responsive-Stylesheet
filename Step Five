@@ -1,0 +1,144 @@
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random; // Assuming you might use this for random selection
+
+// Assume Recommender interface looks something like this:
+// public interface Recommender {
+//     List<String> getItemsToRate();
+//     void printRecommendationsFor(String webRaterID);
+// }
+
+public class RecommendationRunner implements Recommender {
+
+    // You might want to initialize your databases here or in a constructor
+    // For simplicity, let's assume they are initialized statically or passed in.
+    // private static MovieDatabase movieDatabase;
+    // private static RaterDatabase raterDatabase;
+
+    public RecommendationRunner() {
+        // Initialize databases if not already static or handled externally
+        // Ensure MovieDatabase and RaterDatabase are loaded
+        // For example:
+        // MovieDatabase.initialize("ratedmoviesfull.csv");
+        // RaterDatabase.initialize("ratings.csv");
+    }
+
+    @Override
+    public List<String> getItemsToRate() {
+        // This method should return a list of movie IDs for the user to rate.
+        // Let's select a random set of 15 movies.
+        List<String> moviesToRate = new ArrayList<>();
+        int numberOfMovies = 15; // You can adjust this
+
+        // Ensure MovieDatabase is loaded
+        // MovieDatabase.initialize("ratedmoviesfull.csv"); // Call if not already initialized
+
+        List<String> allMovieIDs = MovieDatabase.filterBy(new TrueFilter()); // Get all movie IDs
+
+        // Shuffle the list to get a random selection
+        Collections.shuffle(allMovieIDs, new Random());
+
+        // Take the first 'numberOfMovies' from the shuffled list
+        for (int i = 0; i < Math.min(numberOfMovies, allMovieIDs.size()); i++) {
+            moviesToRate.add(allMovieIDs.get(i));
+        }
+
+        return moviesToRate;
+    }
+
+    @Override
+    public void printRecommendationsFor(String webRaterID) {
+        // This method will print HTML recommendations based on the user's ratings.
+
+        // Ensure MovieDatabase and RaterDatabase are loaded
+        // MovieDatabase.initialize("ratedmoviesfull.csv"); // Call if not already initialized
+        // RaterDatabase.initialize("ratings.csv"); // Call if not already initialized
+
+        FourthRatings fr = new FourthRatings(); // Assuming a default constructor
+        // Or, if your FourthRatings constructor takes RaterDatabase and MovieDatabase:
+        // FourthRatings fr = new FourthRatings(RaterDatabase.getRaters(), MovieDatabase.getAllMovies());
+
+        int minimalRaters = 5; // You can adjust this value
+        int numRecommendations = 10; // Number of top recommendations to display
+
+        // Get the user's ratings from the RaterDatabase
+        Rater userRater = RaterDatabase.getRater(webRaterID);
+
+        // Calculate recommendations using FourthRatings
+        // Assuming getSimilarRatings returns a List<Rating> where Rating contains movie ID and similarity score
+        List<Rating> recommendations = fr.getSimilarRatings(webRaterID, minimalRaters);
+
+        // Filter out movies the user has already rated
+        List<Rating> filteredRecommendations = new ArrayList<>();
+        if (userRater != null) {
+            for (Rating rec : recommendations) {
+                if (!userRater.hasRating(rec.getItem())) { // Assuming getItem() returns movie ID
+                    filteredRecommendations.add(rec);
+                }
+            }
+        } else {
+            filteredRecommendations.addAll(recommendations); // If userRater is null, no ratings to filter
+        }
+
+        // Limit the number of recommendations displayed
+        List<Rating> topRecommendations = new ArrayList<>();
+        for (int i = 0; i < Math.min(numRecommendations, filteredRecommendations.size()); i++) {
+            topRecommendations.add(filteredRecommendations.get(i));
+        }
+
+
+        // Start HTML output
+        System.out.println("<html>");
+        System.out.println("<head>");
+        System.out.println("<title>Your Movie Recommendations</title>");
+        System.out.println("<style>");
+        System.out.println("body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; margin: 20px; }");
+        System.out.println("h2 { color: #0056b3; }");
+        System.out.println("table { width: 80%; border-collapse: collapse; margin-top: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }");
+        System.out.println("th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }");
+        System.out.println("th { background-color: #007bff; color: white; }");
+        System.out.println("tr:nth-child(even) { background-color: #f2f2f2; }");
+        System.out.println("tr:hover { background-color: #e9e9e9; }");
+        System.out.println(".no-recommendations { margin-top: 20px; padding: 15px; border: 1px solid #ffcc00; background-color: #fff8e1; color: #856404; }");
+        System.out.println("</style>");
+        System.out.println("</head>");
+        System.out.println("<body>");
+        System.out.println("<h2>Movies Recommended For You</h2>");
+
+        if (topRecommendations.isEmpty()) {
+            System.out.println("<div class='no-recommendations'>");
+            System.out.println("<p>Sorry, we could not find enough recommendations for you at this time.</p>");
+            System.out.println("<p>Try rating more movies to help us understand your preferences better!</p>");
+            System.out.println("</div>");
+        } else {
+            System.out.println("<table>");
+            System.out.println("<tr>");
+            System.out.println("<th>Rank</th><th>Title</th><th>Year</th><th>Genre</th><th>Director</th>"); // Added Director
+            System.out.println("</tr>");
+
+            int rank = 1;
+            for (Rating rec : topRecommendations) {
+                String movieID = rec.getItem();
+                // Assuming MovieDatabase has methods to get movie details by ID
+                String title = MovieDatabase.getTitle(movieID);
+                int year = MovieDatabase.getYear(movieID);
+                String genres = MovieDatabase.getGenres(movieID);
+                String director = MovieDatabase.getDirector(movieID); // Assuming getDirector exists
+
+                System.out.println("<tr>");
+                System.out.println("<td>" + rank + "</td>");
+                System.out.println("<td>" + title + "</td>");
+                System.out.println("<td>" + year + "</td>");
+                System.out.println("<td>" + genres + "</td>");
+                System.out.println("<td>" + director + "</td>"); // Print director
+                System.out.println("</tr>");
+                rank++;
+            }
+            System.out.println("</table>");
+        }
+
+        System.out.println("</body>");
+        System.out.println("</html>");
+    }
+}
